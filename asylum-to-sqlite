@@ -2,8 +2,8 @@
 <?php
 
 $base_url = "https://lataamo.helsinki.hacklab.fi/admin/members/member/";
-$db_file = __DIR__.'/members.sqlite3';
 $cookies = __DIR__.'/cookies.txt';
+require(__DIR__.'/common.php');
 
 // Prepare cURL
 $curl = curl_init();
@@ -20,10 +20,9 @@ if (curl_setopt_array($curl, [
 }
 
 // Prepare SQL
-$db = new SQLite3($db_file);
-$db->enableExceptions(true);
-$db->exec('BEGIN; DROP TABLE IF EXISTS member; CREATE TABLE member (name,email,nick,city,credit,mtypes,grants);');
-$stmt = $db->prepare('INSERT INTO member (name,email,nick,city,credit,mtypes,grants) VALUES (:rname,:email,:nick,:city,:credit_formatted,:mtypes_formatted,:grants_formatted)');
+$db = init_db();
+$db->exec('BEGIN; DROP TABLE IF EXISTS member; CREATE TABLE member (name,email,nick,city,credit,mtypes,grants,email_norm);');
+$stmt = $db->prepare('INSERT INTO member VALUES (:rname,:email,:nick,:city,:credit_formatted,:mtypes_formatted,:grants_formatted,:email_norm)');
 
 function asylum_load_members($page)
 {
@@ -72,6 +71,11 @@ function store_page($page)
                         $val = null;
                     }
                 }
+
+                if ($param === ':email' && $val !== null) {
+                    $stmt->bindValue(':email_norm', normalize_email($val));
+                }
+
                 $stmt->bindValue($param, $val);
             }
         }

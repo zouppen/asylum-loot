@@ -1,13 +1,12 @@
 #!/usr/bin/env php
 <?php
 
-$db_file = __DIR__.'/members.sqlite3';
+require(__DIR__.'/common.php');
 
 // Prepare SQL
-$db = new SQLite3($db_file);
-$db->enableExceptions(true);
-$db->exec('BEGIN; DROP TABLE IF EXISTS slack; CREATE TABLE slack (username,email,status,active,twofa,sso,userid,fullname,displayname,expiration);');
-$stmt = $db->prepare('INSERT INTO slack VALUES (?,?,?,?,?,?,?,?,?,?)');
+$db = init_db();
+$db->exec('BEGIN; DROP TABLE IF EXISTS slack; CREATE TABLE slack (username,email,status,active,twofa,sso,userid,fullname,displayname,expiration,email_norm);');
+$stmt = $db->prepare('INSERT INTO slack VALUES (?,?,?,?,?,?,?,?,?,?,:email_norm)');
 $count = 0;
 
 // Drop header
@@ -25,13 +24,17 @@ while (true) {
         case 3:
         case 4:
         case 5:
-            $v = intval($rawval);
+            $val = intval($rawval);
             break;
         default:
-            $v = $rawval === '' ? null : $rawval;
+            $val = $rawval === '' ? null : $rawval;
         }
 
-        $stmt->bindValue($i+1, $v);
+        if ($i === 1 && $val !== null) {
+            $stmt->bindValue(':email_norm', normalize_email($val));
+        }
+
+        $stmt->bindValue($i+1, $val);
     }
 
     $stmt->execute();

@@ -7,7 +7,7 @@ cross-tabulation and other housekeeping tasks.
 
 ## Requirements
 
-Way to steal cookies from a browser. For firefox, install
+Way to steal cookies from a browser. For Firefox, install
 [cookies.txt Firefox add-on](https://addons.mozilla.org/fi/firefox/addon/cookies-txt).
 
 ### Fedora
@@ -41,5 +41,11 @@ Slack users:
 Get user name, email and nicks on both Asylum and Slack:
 
 ```sqlite
-SELECT m.name, m.email, m.nick, s.username FROM member m LEFT JOIN slack s ON s.email=m.email;
+SELECT m.name, m.email, m.nick, s.username FROM member m LEFT JOIN slack s ON s.email_norm=m.email_norm WHERE status !='Deactivated';
+```
+
+Get list of Slack usernames which don't match membership registry:
+
+```sqlite
+SELECT username FROM slack s LEFT JOIN member m ON m.email_norm=s.email_norm WHERE status NOT IN('Deactivated','Bot') AND m.email IS NOT NULL;
 ```
