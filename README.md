@@ -29,6 +29,4 @@ Steps:
 1. Steal cookies from your browser and place them to `cookies.txt`
 in this directory. Use a browser add-on instructed above.
 2. Run `./asylum-to-sqlite`
-3. File `database members.sqlite3` is populated. Examine it with `sqlite3` or other tools.
-
-
+3. Run `sqlite3 members.sqlite3` and enjoy!
