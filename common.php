@@ -2,7 +2,13 @@
 
 function normalize_email($orig)
 {
-    return preg_replace('/\+[^@]*@/', '@', $orig);
+    $plusless = preg_replace('/\+[^@]*@/', '@', $orig);
+
+    // OBS! E-mail addresses except the domain part are case
+    // sensitive. But in practice people write them as they will and
+    // most e-mail providers handle them in case-insensitive
+    // manner. So, to avoid confusion, we normalize everything.
+    return strtolower($plusless);
 }
 
 function init_db()
