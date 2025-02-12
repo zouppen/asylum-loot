@@ -76,10 +76,7 @@ function store_page($page)
             }
         }
 
-        if ($stmt->execute() === false) {
-            die("Unable to insert row to SQLite\n");
-        }
-
+        $stmt->execute();
         $count++;
     }
 
