@@ -1,7 +1,8 @@
 #!/usr/bin/env php
 <?php
 
-$base_url = "https://lataamo.helsinki.hacklab.fi/admin/members/member/";
+$members_url = "https://lataamo.helsinki.hacklab.fi/admin/members/member/";
+$slackid_url = "https://lataamo.helsinki.hacklab.fi/admin/access/token/?all=&ttype=6";
 $cookies = __DIR__.'/cookies.txt';
 require(__DIR__.'/common.php');
 
@@ -15,21 +16,40 @@ if (curl_setopt_array($curl, [
     CURLOPT_COOKIEJAR => $cookies,
     CURLOPT_FAILONERROR => true,
     CURLOPT_RETURNTRANSFER => true,
+    //CURLOPT_VERBOSE => true,
 ]) === false) {
     die("Setting curl options failed\n");
 }
 
 // Prepare SQL
 $db = init_db();
-$db->exec('BEGIN; DROP TABLE IF EXISTS member; CREATE TABLE member (name,email,nick,city,credit,mtypes,grants,email_norm);');
-$stmt = $db->prepare('INSERT INTO member VALUES (:rname,:email,:nick,:city,:credit_formatted,:mtypes_formatted,:grants_formatted,:email_norm)');
+$db->exec('BEGIN; DROP TABLE IF EXISTS member; CREATE TABLE member (name,email,nick,city,credit,mtypes,grants,email_norm,slack_id);');
+$stmt_member = $db->prepare('INSERT INTO member (name,email,nick,city,credit,mtypes,grants,email_norm) VALUES (:rname,:email,:nick,:city,:credit_formatted,:mtypes_formatted,:grants_formatted,:email_norm)');
+$stmt_slack = $db->prepare('UPDATE member SET slack_id=:id WHERE email=:email');
 
 function asylum_load_members($page)
 {
-    global $base_url, $curl;
+    global $members_url, $curl;
 
-    $url = $base_url . '?' . http_build_query(['p' => $page]);
+    $url = $members_url . '?' . http_build_query(['p' => $page]);
     curl_setopt($curl, CURLOPT_URL, $url);
+
+    $html = curl_exec($curl);
+    if ($html === false) {
+        die("Unable to load document from Asylum\n");
+    }
+
+    // To DOM
+    $doc = new DOMDocument();
+    $doc->loadHTML('<?xml encoding="UTF-8">'.$html);
+    return $doc;
+}
+
+function asylum_load_slack_userids()
+{
+    global $slackid_url, $curl;
+
+    curl_setopt($curl, CURLOPT_URL, $slackid_url);
 
     $html = curl_exec($curl);
     if ($html === false) {
@@ -44,7 +64,7 @@ function asylum_load_members($page)
 
 function store_page($page)
 {
-    global $stmt;
+    global $stmt_member;
 
     $doc = asylum_load_members($page);
     $xpath = new DOMXpath($doc);
@@ -52,7 +72,7 @@ function store_page($page)
     $count = 0;
 
     foreach ($rows as $row) {
-        $stmt->reset();
+        $stmt_member->reset();
     
         // Just extract cells
         $cells = $xpath->query("th|td", $row);
@@ -73,18 +93,47 @@ function store_page($page)
                 }
 
                 if ($param === ':email' && $val !== null) {
-                    $stmt->bindValue(':email_norm', normalize_email($val));
+                    $stmt_member->bindValue(':email_norm', normalize_email($val));
                 }
 
-                $stmt->bindValue($param, $val);
+                $stmt_member->bindValue($param, $val);
             }
         }
 
-        $stmt->execute();
+        $stmt_member->execute();
         $count++;
     }
 
     return $count;
+}
+
+function store_slack_ids()
+{
+    global $db, $stmt_slack;
+
+    $doc = asylum_load_slack_userids();
+    $xpath = new DOMXpath($doc);
+    $rows = $xpath->query("id('result_list')/tbody/tr");
+
+    foreach ($rows as $row) {
+        $stmt_slack->reset();
+    
+        // Just extract cells
+        $user_p = $xpath->query("*[@class='field-owner_f']", $row);
+        $slack_p = $xpath->query("*[@class='field-value_formatted']", $row);
+
+        if (preg_match('/.*<(.*)>/', $user_p[0]->textContent, $matches) !== 1) {
+            print("Skipping invalid user string\n");
+            continue;
+        }
+        $email = $matches[1];
+        $stmt_slack->bindValue('email', $email);
+        $stmt_slack->bindValue('id', $slack_p[0]->textContent);
+        $stmt_slack->execute();
+        if ($db->changes() != 1) {
+            die("Something weird going on, email $email not found\n");
+        }
+    }
 }
 
 for ($i = 1; ; $i++) {
@@ -92,6 +141,13 @@ for ($i = 1; ; $i++) {
     print("Page $i: parsed $got members\n");
     if ($got < 100) break;
 }
+
+store_slack_ids();
+
+// Housekeeping
+$db->exec('UPDATE member AS m SET slack_id=s.userid FROM (SELECT userid, email FROM slack) AS s WHERE m.slack_id IS NULL AND s.email = m.email');
+$changes = $db->changes();
+print("Matched $changes email pairs with Slack\n");
 
 // Commit the changes
 $db->exec('END');
