@@ -145,7 +145,7 @@ for ($i = 1; ; $i++) {
 store_slack_ids();
 
 // Housekeeping
-$db->exec('UPDATE member AS m SET slack_id=s.userid FROM (SELECT userid, email FROM slack) AS s WHERE m.slack_id IS NULL AND s.email = m.email');
+$db->exec('UPDATE member AS m SET slack_id=s.userid FROM (SELECT userid, email_norm FROM slack) AS s WHERE m.slack_id IS NULL AND s.email_norm = m.email_norm');
 $changes = $db->changes();
 print("Matched $changes email pairs with Slack\n");
 
