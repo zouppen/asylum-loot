@@ -1,8 +1,8 @@
 #!/usr/bin/env php
 <?php
 
-$members_url = "https://lataamo.helsinki.hacklab.fi/admin/members/member/";
-$slackid_url = "https://lataamo.helsinki.hacklab.fi/admin/access/token/?all=&ttype=6";
+$members_url = "https://lataamo.helsinki.hacklab.fi/api/members/?format=json";
+$slackid_url = "https://lataamo.helsinki.hacklab.fi/api/access/tokens/?format=json&revoked=false&ttype=6";
 $cookies = __DIR__.'/cookies.txt';
 require(__DIR__.'/common.php');
 
@@ -23,131 +23,114 @@ if (curl_setopt_array($curl, [
 
 // Prepare SQL
 $db = init_db();
-$db->exec('BEGIN; DROP TABLE IF EXISTS member; CREATE TABLE member (name,email,nick,city,credit,mtypes,grants,email_norm,slack_id);');
-$stmt_member = $db->prepare('INSERT INTO member (name,email,nick,city,credit,mtypes,grants,email_norm) VALUES (:rname,:email,:nick,:city,:credit_formatted,:mtypes_formatted,:grants_formatted,:email_norm)');
-$stmt_slack = $db->prepare('UPDATE member SET slack_id=:id WHERE email=:email');
+$db->exec('BEGIN; DROP TABLE IF EXISTS member; CREATE TABLE member (url,credit,fname,lname,city,email,phone,nick,accepted,anonymized_id,member_id,email_norm); DROP TABLE IF EXISTS member_slack; CREATE TABLE member_slack (owner,value,revoked);');
+$stmt_member = $db->prepare('INSERT INTO member VALUES(:url,:credit,:fname,:lname,:city,:email,:phone,:nick,:accepted,:anonymized_id,:member_id,:email_norm)');
+$stmt_slack = $db->prepare('INSERT INTO member_slack VALUES (:owner,:value,:revoked)');
 
-function asylum_load_members($page)
+// Due to Asylum misconfiguration, HTTPS is not used. Force it.
+function force_https($url)
 {
-    global $members_url, $curl;
+    if ($url === null) {
+        return null;
+    } else {
+        return preg_replace('/^http:/', 'https:', $url);
+    }
+}
 
-    $url = $members_url . '?' . http_build_query(['p' => $page]);
+function get_json($url)
+{
+    global $curl;
+
     curl_setopt($curl, CURLOPT_URL, $url);
 
-    $html = curl_exec($curl);
-    if ($html === false) {
+    $json = curl_exec($curl);
+    if ($json === false) {
         die("Unable to load document from Asylum\n");
     }
 
-    // To DOM
-    $doc = new DOMDocument();
-    $doc->loadHTML('<?xml encoding="UTF-8">'.$html);
-    return $doc;
-}
-
-function asylum_load_slack_userids()
-{
-    global $slackid_url, $curl;
-
-    curl_setopt($curl, CURLOPT_URL, $slackid_url);
-
-    $html = curl_exec($curl);
-    if ($html === false) {
-        die("Unable to load document from Asylum\n");
+    // To JSON
+    $o = json_decode($json, true);
+    if ($o === false) {
+        die("Invalid output from Asylum\n");
     }
-
-    // To DOM
-    $doc = new DOMDocument();
-    $doc->loadHTML('<?xml encoding="UTF-8">'.$html);
-    return $doc;
+    return $o;
 }
 
-function store_page($page)
+function store_member_page($page)
 {
     global $stmt_member;
 
-    $doc = asylum_load_members($page);
-    $xpath = new DOMXpath($doc);
-    $rows = $xpath->query("id('result_list')/tbody/tr");
-    $count = 0;
+    /// Start by loading the first page
+    $doc = get_json($page);
 
-    foreach ($rows as $row) {
-        $stmt_member->reset();
-    
-        // Just extract cells
-        $cells = $xpath->query("th|td", $row);
-        foreach ($cells as $cell) {
-            $cls = $cell->getAttribute('class');
-            if (str_starts_with($cls, 'field-')) {
-                // Only cells with field prefix contain data we need
-                $param = ':'.substr($cls, 6);
-                switch ($param) {
-                case ':credit_formatted':
-                    $val = floatval($cell->textContent);
-                    break;
-                default:
-                    $val = $cell->textContent;
-                    if ($val === '') {
-                        $val = null;
-                    }
-                }
-
-                if ($param === ':email' && $val !== null) {
-                    $stmt_member->bindValue(':email_norm', normalize_email($val));
-                }
-
-                $stmt_member->bindValue($param, $val);
-            }
+    foreach ($doc['results'] as $k => $member) {
+        if ($member['url'] === 'http://lataamo.helsinki.hacklab.fi/api/members/581/?format=json') {
+            print("petteri $k sivulla $page\n");
         }
 
+        $stmt_member->reset();
+
+        // Member types are not interesting
+        unset($member['mtypes']);
+
+        // Convert credit to a number
+        $member['credit'] = floatval($member['credit']);
+
+        // Normalize email
+        $member['email_norm'] = normalize_email($member['email']);
+
+        // Insert to the database
+        foreach ($member as $k => $v) {
+            $stmt_member->bindValue(':'.$k, $v);
+        }
         $stmt_member->execute();
-        $count++;
     }
 
-    return $count;
+    return force_https($doc['next']);
 }
 
-function store_slack_ids()
+function store_slack_ids($page)
 {
     global $db, $stmt_slack;
 
-    $doc = asylum_load_slack_userids();
-    $xpath = new DOMXpath($doc);
-    $rows = $xpath->query("id('result_list')/tbody/tr");
+    $doc = get_json($page);
 
-    foreach ($rows as $row) {
+    foreach ($doc['results'] as $member) {
         $stmt_slack->reset();
-    
-        // Just extract cells
-        $user_p = $xpath->query("*[@class='field-owner_f']", $row);
-        $slack_p = $xpath->query("*[@class='field-value_formatted']", $row);
 
-        if (preg_match('/.*<(.*)>/', $user_p[0]->textContent, $matches) !== 1) {
-            print("Skipping invalid user string\n");
-            continue;
+        // We don't need everything
+        unset($member['url']);
+        unset($member['label']);
+        unset($member['type']);
+
+        // Put the rest
+        foreach ($member as $k => $v) {
+            $stmt_slack->bindValue(':'.$k, $v);
         }
-        $email = $matches[1];
-        $stmt_slack->bindValue('email', $email);
-        $stmt_slack->bindValue('id', $slack_p[0]->textContent);
         $stmt_slack->execute();
-        if ($db->changes() != 1) {
-            die("Something weird going on, email $email not found\n");
-        }
     }
+
+    return force_https($doc['next']);
 }
 
-for ($i = 1; ; $i++) {
-    $got = store_page($i);
-    print("Page $i: parsed $got members\n");
-    if ($got < 100) break;
+// Members
+$page = $members_url;
+for ($i=1; $page !== null; $i++) {
+    $page = store_member_page($page);
+    print("Member page $i parsed\n");
 }
 
-store_slack_ids();
+// Slack exceptions
+$page = $slackid_url;
+for ($i=1; $page !== null; $i++) {
+    $page = store_slack_ids($page);
+    print("Slack ID page $i parsed\n");
+}
 
 // Housekeeping
-$db->exec('UPDATE member AS m SET slack_id=s.userid FROM (SELECT userid, email_norm FROM slack) AS s WHERE m.slack_id IS NULL AND s.email_norm = m.email_norm');
-$changes = $db->changes();
-print("Matched $changes email pairs with Slack\n");
+//$db->exec('UPDATE member AS m SET slack_id=s.userid FROM (SELECT userid, email_norm FROM slack) AS s WHERE m.slack_id IS NULL AND s.email_norm = m.email_norm');
+//$changes = $db->changes();
+//print("Matched $changes email pairs with Slack\n");
 
 // Commit the changes
 $db->exec('END');

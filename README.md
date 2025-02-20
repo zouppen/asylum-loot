@@ -5,7 +5,8 @@ management solution for [Helsinki Hacklab](https://helsinki.hacklab.fi/).
 This tool extracts member data from Asylum to SQLite to ease
 cross-tabulation and other housekeeping tasks.
 
-TODO: There is proper API for Django. Use that instead.
+**NB!** This branch is broken because Asylum API has unstable ordering
+and gives duplicate members and skips on. Use master branch instead!
 
 ## Requirements
 
