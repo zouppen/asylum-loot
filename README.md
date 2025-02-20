@@ -28,17 +28,23 @@ sudo apt install php-cli php-sqlite3 php-xml
 
 ## Usage
 
-Asylum data:
-
-1. Steal cookies from your browser and place them to `cookies.txt`
-in this directory. Use a browser add-on instructed above.
-2. Run `./asylum-to-sqlite`
-3. Run `sqlite3 members.sqlite3` and enjoy!
+Run Slack first, then Asylum, to get Slack IDs to match
+with members.
 
 Slack users:
 
 1. Download user CSV from Slack admin panel
 2. Run: `./slack-to-sqlite <slack-helsinkihacklab-members.csv`
+
+Asylum data:
+
+1. Steal cookies from your browser and place them to `cookies.txt`
+in this directory. Use a browser add-on instructed above.
+2. Run `./asylum-to-sqlite`
+
+The scripts populate an SQLite database. Run `sqlite3 members.sqlite3`
+and enjoy! In case you want to start over, you may just re-run the
+scripts.
 
 ## Useful queries
 
