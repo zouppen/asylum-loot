@@ -11,6 +11,11 @@ function normalize_email($orig)
     return strtolower($plusless);
 }
 
+function slack_match($db)
+{
+    $db->exec('UPDATE member SET slack_id=slack_id_force; UPDATE member AS m SET slack_id=s.id FROM (SELECT id, email_norm FROM slack WHERE alive) AS s WHERE m.slack_id IS NULL AND s.email_norm=m.email_norm');
+}
+
 function init_db()
 {
     $db_file = __DIR__.'/members.sqlite3';
