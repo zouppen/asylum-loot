@@ -58,7 +58,7 @@ SELECT m.name, m.email, m.nick, s.displayname FROM member m LEFT JOIN slack s ON
 Get list of Slack usernames which don't match membership registry:
 
 ```sqlite
-SELECT s.id, s.email FROM slack s LEFT JOIN member m ON m.slack_id=s.id WHERE alive AND m.email IS NULL;
+SELECT s.id, s.email FROM slack s LEFT JOIN member m ON m.slack_id=s.id WHERE alive AND m.slack_id IS NULL;
 ```
 
 Get list of members who don't have Slack:

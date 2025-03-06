@@ -23,9 +23,9 @@ if (curl_setopt_array($curl, [
 
 // Prepare SQL
 $db = init_db();
-$db->exec('BEGIN; DROP TABLE IF EXISTS member; CREATE TABLE member (name,email,nick,city,credit,mtypes,grants,email_norm,slack_id);');
+$db->exec('BEGIN; DROP TABLE IF EXISTS member; CREATE TABLE member (name,email,nick,city,credit,mtypes,grants,email_norm,slack_id_force, slack_id);');
 $stmt_member = $db->prepare('INSERT INTO member (name,email,nick,city,credit,mtypes,grants,email_norm) VALUES (:rname,:email,:nick,:city,:credit_formatted,:mtypes_formatted,:grants_formatted,:email_norm)');
-$stmt_slack = $db->prepare('UPDATE member SET slack_id=:id WHERE email=:email');
+$stmt_slack = $db->prepare('UPDATE member SET slack_id_force=:id WHERE email=:email');
 
 function asylum_load_members($page)
 {
@@ -145,9 +145,8 @@ for ($i = 1; ; $i++) {
 store_slack_ids();
 
 // Housekeeping
-$db->exec('UPDATE member AS m SET slack_id=s.id FROM (SELECT id, email_norm FROM slack WHERE alive) AS s WHERE m.slack_id IS NULL AND s.email_norm = m.email_norm');
-$changes = $db->changes();
-print("Matched $changes email pairs with Slack\n");
+$db->exec('UPDATE member SET slack_id=slack_id_force; UPDATE member AS m SET slack_id=s.id FROM (SELECT id, email_norm FROM slack WHERE alive) AS s WHERE m.slack_id IS NULL AND s.email_norm=m.email_norm');
+print("Matched Slack IDs\n");
 
 // Commit the changes
 $db->exec('END');
