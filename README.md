@@ -28,9 +28,6 @@ sudo apt install php-cli php-sqlite3 php-xml
 
 ## Usage
 
-Run Slack first, then Asylum, to get Slack IDs to match
-with members.
-
 Slack users:
 
 1. Get a Slack API token with `users:read` scope.
@@ -42,6 +39,8 @@ Asylum data:
 1. Steal cookies from your browser and place them to `cookies.txt`
 in this directory. Use a browser add-on instructed above.
 2. Run `./asylum-to-sqlite`
+
+To run them both at once, there's a script `./update_db`.
 
 The scripts populate an SQLite database. Run `sqlite3 members.sqlite3`
 and enjoy! In case you want to start over, you may just re-run the
