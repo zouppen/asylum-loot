@@ -95,7 +95,7 @@ while (true) {
     }
 }
 
+slack_match($db);
+
 $db->exec('END');
 curl_close($curl);
-
-print("Parsed $count Slack accounts\n");

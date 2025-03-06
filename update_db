@@ -1,0 +1,5 @@
+#!/bin/sh -eu
+
+cd "$(dirname "$0")"
+./slack-to-sqlite
+./asylum-to-sqlite

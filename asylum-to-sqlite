@@ -147,7 +147,5 @@ for ($i = 1; ; $i++) {
 store_slack_ids();
 slack_match($db);
 
-print("Slack IDs matched\n");
-
 // Commit the changes
 $db->exec('END');
