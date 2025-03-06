@@ -43,7 +43,7 @@ $count = 0;
 $params = ["limit" => 100];
 
 while (true) {
-    print("Fetching page $page...\n");
+    print("Slack page $page...\n");
 
     if (curl_setopt($curl, CURLOPT_URL, $api_url.'?'.http_build_query($params)) === false) {
         die("Setting curl options failed\n");

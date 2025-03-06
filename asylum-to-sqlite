@@ -41,7 +41,9 @@ function asylum_load_members($page)
 
     // To DOM
     $doc = new DOMDocument();
+    libxml_use_internal_errors(true);
     $doc->loadHTML('<?xml encoding="UTF-8">'.$html);
+    libxml_clear_errors();
     return $doc;
 }
 
@@ -127,8 +129,8 @@ function store_slack_ids()
             continue;
         }
         $email = $matches[1];
-        $stmt_slack->bindValue('email', $email);
-        $stmt_slack->bindValue('id', strtoupper(trim($slack_p[0]->textContent)));
+        $stmt_slack->bindValue(':email', $email);
+        $stmt_slack->bindValue(':id', strtoupper(trim($slack_p[0]->textContent)));
         $stmt_slack->execute();
         if ($db->changes() != 1) {
             die("Something weird going on, email $email not found\n");
@@ -138,7 +140,7 @@ function store_slack_ids()
 
 for ($i = 1; ; $i++) {
     $got = store_page($i);
-    print("Page $i: parsed $got members\n");
+    print("Asylum page $i: parsed $got members\n");
     if ($got < 100) break;
 }
 
