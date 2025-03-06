@@ -128,7 +128,7 @@ function store_slack_ids()
         }
         $email = $matches[1];
         $stmt_slack->bindValue('email', $email);
-        $stmt_slack->bindValue('id', $slack_p[0]->textContent);
+        $stmt_slack->bindValue('id', strtoupper(trim($slack_p[0]->textContent)));
         $stmt_slack->execute();
         if ($db->changes() != 1) {
             die("Something weird going on, email $email not found\n");
