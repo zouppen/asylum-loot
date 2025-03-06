@@ -19,7 +19,6 @@ if ($curl === false) {
 
 // Set cURL options using curl_setopt_array
 if (curl_setopt_array($curl, [
-    CURLOPT_URL => $api_url,
     CURLOPT_HTTPHEADER => [
         "Authorization: Bearer $slack_token",
     ],
@@ -30,48 +29,61 @@ if (curl_setopt_array($curl, [
     die("Setting curl options failed\n");
 }
 
-// Execute cURL request and close session
-$response = curl_exec($curl);
-if ($response === false) {
-    die("Unable to load users from Slack\n");
-}
-curl_close($curl);
-
-// Decode response
-$data = json_decode($response, true);
-if ($data === null) {
-    die("Unable to load decode Slack response\n");
-}
-
-if ($data['response_metadata']['next_cursor'] !== '') {
-    die("TODO pagination support missing. Can't load all of them!\n");
-}
-
 // Prepare SQL
 $db = init_db();
 $db->exec('BEGIN; DROP TABLE IF EXISTS slack; CREATE TABLE slack (id,name,deleted,real_name,title,displayname,email,email_norm,bot,updated,email_confirmed);');
 $stmt = $db->prepare('INSERT INTO slack VALUES (:id,:name,:deleted,:real_name,:title,:displayname,:email,:email_norm,:bot,:updated,:email_confirmed)');
 
+$page = 1;
 $count = 0;
+$params = ["limit" => 100];
 
-foreach ($data['members'] as $member) {
-    //var_dump($member);
-    $email = @$member['profile']['email'];
-    $stmt->bindValue(':id', $member['id']);
-    $stmt->bindValue(':name', $member['name']);
-    $stmt->bindValue(':deleted', $member['deleted']);
-    $stmt->bindValue(':real_name', $member['profile']['real_name']);
-    $stmt->bindValue(':title', $member['profile']['title']);
-    $stmt->bindValue(':displayname', $member['profile']['display_name']);
-    $stmt->bindValue(':email', $email);
-    $stmt->bindValue(':email_norm', normalize_email($email));
-    $stmt->bindValue(':bot', $member['is_bot']);
-    $stmt->bindValue(':updated', $member['updated']);
-    $stmt->bindValue(':email_confirmed', @$member['is_email_confirmed']);
+while (true) {
+    print("Fetching page $page...\n");
 
-    $stmt->execute();
-    $count++;
+    if (curl_setopt($curl, CURLOPT_URL, $api_url.'?'.http_build_query($params)) === false) {
+        die("Setting curl options failed\n");
+    }
+
+    // Execute cURL request and close session
+    $response = curl_exec($curl);
+    if ($response === false) {
+        die("Unable to load users from Slack\n");
+    }
+
+    // Decode response
+    $data = json_decode($response, true);
+    if ($data === null) {
+        die("Unable to load decode Slack response\n");
+    }
+
+    foreach ($data['members'] as $member) {
+        $email = @$member['profile']['email'];
+        $stmt->bindValue(':id', $member['id']);
+        $stmt->bindValue(':name', $member['name']);
+        $stmt->bindValue(':deleted', $member['deleted']);
+        $stmt->bindValue(':real_name', $member['profile']['real_name']);
+        $stmt->bindValue(':title', $member['profile']['title']);
+        $stmt->bindValue(':displayname', $member['profile']['display_name']);
+        $stmt->bindValue(':email', $email);
+        $stmt->bindValue(':email_norm', normalize_email($email));
+        $stmt->bindValue(':bot', $member['is_bot']);
+        $stmt->bindValue(':updated', $member['updated']);
+        $stmt->bindValue(':email_confirmed', @$member['is_email_confirmed']);
+
+        $stmt->execute();
+        $count++;
+    }
+
+    $page++;
+    $params['cursor'] = $data['response_metadata']['next_cursor'];
+    if (empty($params['cursor'])) {
+        // All done
+        break;
+    }
 }
 
 $db->exec('END');
+curl_close($curl);
+
 print("Parsed $count Slack accounts\n");
