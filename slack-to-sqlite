@@ -6,6 +6,10 @@ require(__DIR__.'/common.php');
 // Slack API Token (Requires 'users:read' scope)
 $slack_token = file_get_contents(__DIR__.'/token.txt');
 $api_url = "https://slack.com/api/users.list";
+$allowed_dangling_users = [
+    'USLACKBOT', // Slackbot
+    'U5LAEDTFZ', // Helsinki Hacklab owner
+];
 
 if ($slack_token === false) {
     die("Slack token file not found\n");
@@ -31,8 +35,8 @@ if (curl_setopt_array($curl, [
 
 // Prepare SQL
 $db = init_db();
-$db->exec('BEGIN; DROP TABLE IF EXISTS slack; CREATE TABLE slack (id,name,deleted,real_name,title,displayname,email,email_norm,bot,updated,email_confirmed);');
-$stmt = $db->prepare('INSERT INTO slack VALUES (:id,:name,:deleted,:real_name,:title,:displayname,:email,:email_norm,:bot,:updated,:email_confirmed)');
+$db->exec('BEGIN; DROP TABLE IF EXISTS slack; CREATE TABLE slack (id,name,deleted,real_name,title,displayname,email,email_norm,bot,updated,email_confirmed,alive);');
+$stmt = $db->prepare('INSERT INTO slack VALUES (:id,:name,:deleted,:real_name,:title,:displayname,:email,:email_norm,:bot,:updated,:email_confirmed,:alive)');
 
 $page = 1;
 $count = 0;
@@ -58,7 +62,14 @@ while (true) {
     }
 
     foreach ($data['members'] as $member) {
+        // Email for later normalization
         $email = @$member['profile']['email'];
+
+        // Simplify queries and get alive accounts
+        $alive = !($member['is_bot'] ||
+                   $member['deleted'] ||
+                   in_array($member['id'], $allowed_dangling_users));
+
         $stmt->bindValue(':id', $member['id']);
         $stmt->bindValue(':name', $member['name']);
         $stmt->bindValue(':deleted', $member['deleted']);
@@ -70,6 +81,7 @@ while (true) {
         $stmt->bindValue(':bot', $member['is_bot']);
         $stmt->bindValue(':updated', $member['updated']);
         $stmt->bindValue(':email_confirmed', @$member['is_email_confirmed']);
+        $stmt->bindValue(':alive', $alive);
 
         $stmt->execute();
         $count++;

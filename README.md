@@ -33,8 +33,9 @@ with members.
 
 Slack users:
 
-1. Download user CSV from Slack admin panel
-2. Run: `./slack-to-sqlite <slack-helsinkihacklab-members.csv`
+1. Get a Slack API token with `users:read` scope.
+2. Place it to `token.txt` in this directory
+2. Run: `./slack-to-sqlite`
 
 Asylum data:
 
@@ -51,11 +52,17 @@ scripts.
 Get user name, email and nicks on both Asylum and Slack:
 
 ```sqlite
-SELECT m.name, m.email, m.nick, s.username FROM member m LEFT JOIN slack s ON s.email_norm=m.email_norm WHERE status !='Deactivated';
+SELECT m.name, m.email, m.nick, s.displayname FROM member m LEFT JOIN slack s ON s.id=m.slack_id WHERE alive;
 ```
 
 Get list of Slack usernames which don't match membership registry:
 
 ```sqlite
-SELECT username FROM slack s LEFT JOIN member m ON m.email_norm=s.email_norm WHERE status NOT IN('Deactivated','Bot') AND m.email IS NOT NULL;
+SELECT s.id, s.email FROM slack s LEFT JOIN member m ON m.slack_id=s.id WHERE alive AND m.email IS NULL;
+```
+
+Get list of members who don't have Slack:
+
+```sqlite
+SELECT name, email, credit FROM member WHERE slack_id IS NULL ORDER BY credit>=0, name;
 ```
