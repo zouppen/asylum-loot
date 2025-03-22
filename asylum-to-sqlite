@@ -9,7 +9,7 @@ require(__DIR__.'/common.php');
 // Prepare cURL
 $curl = curl_init();
 if ($curl === false) {
-    die("Curl initialization failed\n");
+    die_hard("Curl initialization failed");
 }
 if (curl_setopt_array($curl, [
     CURLOPT_COOKIEFILE => $cookies,
@@ -18,7 +18,7 @@ if (curl_setopt_array($curl, [
     CURLOPT_RETURNTRANSFER => true,
     //CURLOPT_VERBOSE => true,
 ]) === false) {
-    die("Setting curl options failed\n");
+    die_hard("Setting curl options failed");
 }
 
 // Prepare SQL
@@ -36,7 +36,7 @@ function asylum_load_members($page)
 
     $html = curl_exec($curl);
     if ($html === false) {
-        die("Unable to load document from Asylum\n");
+        die_hard("Unable to load document from Asylum");
     }
 
     // To DOM
@@ -55,7 +55,7 @@ function asylum_load_slack_userids()
 
     $html = curl_exec($curl);
     if ($html === false) {
-        die("Unable to load document from Asylum\n");
+        die_hard("Unable to load document from Asylum");
     }
 
     // To DOM
@@ -133,7 +133,7 @@ function store_slack_ids()
         $stmt_slack->bindValue(':id', strtoupper(trim($slack_p[0]->textContent)));
         $stmt_slack->execute();
         if ($db->changes() != 1) {
-            die("Something weird going on, email $email not found\n");
+            die_hard("Something weird going on, email $email not found");
         }
     }
 }

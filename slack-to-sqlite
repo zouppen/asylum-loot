@@ -12,13 +12,13 @@ $allowed_dangling_users = [
 ];
 
 if ($slack_token === false) {
-    die("Slack token file not found\n");
+    die_hard("Slack token file not found");
 }
 
 // Initialize cURL session
 $curl = curl_init();
 if ($curl === false) {
-    die("Curl initialization failed\n");
+    die_hard("Curl initialization failed");
 }
 
 // Set cURL options using curl_setopt_array
@@ -30,7 +30,7 @@ if (curl_setopt_array($curl, [
     CURLOPT_RETURNTRANSFER => true,
     //CURLOPT_VERBOSE => true,
 ]) === false) {
-    die("Setting curl options failed\n");
+    die_hard("Setting curl options failed");
 }
 
 // Prepare SQL
@@ -46,19 +46,19 @@ while (true) {
     print("Slack page $page...\n");
 
     if (curl_setopt($curl, CURLOPT_URL, $api_url.'?'.http_build_query($params)) === false) {
-        die("Setting curl options failed\n");
+        die_hard("Setting curl options failed");
     }
 
     // Execute cURL request and close session
     $response = curl_exec($curl);
     if ($response === false) {
-        die("Unable to load users from Slack\n");
+        die_hard("Unable to load users from Slack");
     }
 
     // Decode response
     $data = json_decode($response, true);
     if ($data === null) {
-        die("Unable to load decode Slack response\n");
+        die_hard("Unable to load decode Slack response");
     }
 
     foreach ($data['members'] as $member) {

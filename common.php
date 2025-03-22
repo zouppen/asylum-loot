@@ -23,3 +23,9 @@ function init_db()
     $db->enableExceptions(true);
     return $db;
 }
+
+function die_hard($format, ...$args)
+{
+    fprintf(STDERR, $format."\n", ...$args);
+    exit(1);
+}
