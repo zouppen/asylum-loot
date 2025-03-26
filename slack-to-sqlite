@@ -39,11 +39,10 @@ $db->exec('BEGIN; DROP TABLE IF EXISTS slack; CREATE TABLE slack (id,name,delete
 $stmt = $db->prepare('INSERT INTO slack VALUES (:id,:name,:deleted,:real_name,:title,:displayname,:email,:email_norm,:bot,:updated,:email_confirmed,:alive)');
 
 $page = 1;
-$count = 0;
 $params = ["limit" => 100];
 
 while (true) {
-    print("Slack page $page...\n");
+    printf("Slack page %d... ", $page);
 
     if (curl_setopt($curl, CURLOPT_URL, $api_url.'?'.http_build_query($params)) === false) {
         die_hard("Setting curl options failed");
@@ -61,6 +60,7 @@ while (true) {
         die_hard("Unable to load decode Slack response");
     }
 
+    $count = 0;
     foreach ($data['members'] as $member) {
         // Email for later normalization
         $email = @$member['profile']['email'];
@@ -86,6 +86,7 @@ while (true) {
         $stmt->execute();
         $count++;
     }
+    printf("parsed %3d users\n", $count);
 
     $page++;
     $params['cursor'] = $data['response_metadata']['next_cursor'];

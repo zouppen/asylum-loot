@@ -140,9 +140,10 @@ function store_slack_ids()
 
 $total = 0;
 for ($i = 1; ; $i++) {
+    printf("Asylum page %d... ", $i);
     $got = store_page($i);
     $total += $got;
-    print("Asylum page $i: parsed $got members\n");
+    printf("parsed %3d members\n", $got);
     if ($got < 100) break;
 }
 
