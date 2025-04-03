@@ -1,0 +1,104 @@
+#!/usr/bin/env php
+<?php
+
+require(__DIR__.'/common.php');
+
+// Slack API Token (Requires 'users.profile:write' and
+// 'users.profile:write' scopes)
+$slack_token = file_get_contents(__DIR__.'/token.txt');
+$api_get_url = "https://slack.com/api/users.profile.get";
+$api_set_url = "https://slack.com/api/users.profile.set";
+
+$add_suffix = " (deactivated 2025-04)";
+
+if ($slack_token === false) {
+    die_hard("Slack token file not found");
+}
+
+// Initialize cURL session
+$curl = curl_init();
+if ($curl === false) {
+    die_hard("Curl initialization failed");
+}
+
+// Set cURL options using curl_setopt_array
+if (curl_setopt_array($curl, [
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer $slack_token",
+    ],
+    CURLOPT_FAILONERROR => true,
+    CURLOPT_RETURNTRANSFER => true,
+    //CURLOPT_VERBOSE => true,
+]) === false) {
+    die_hard("Setting curl options failed");
+}
+
+while (true) {
+    $line = fgets(STDIN);
+    if ($line === false) {
+        break;
+    }
+    $slack_id = trim($line);
+    if ($slack_id === "") {
+        continue;
+    }
+
+    printf("User %s... ", $slack_id);
+
+    $params = [
+        'user' => $slack_id,
+    ];
+    
+    if (curl_setopt($curl, CURLOPT_URL, $api_get_url.'?'.http_build_query($params)) === false) {
+        die_hard("Setting curl options failed");
+    }
+    
+    // Execute cURL request and close session
+    $response = curl_exec($curl);
+    if ($response === false) {
+        die_hard("Unable to load user data from Slack");
+    }
+
+    $data = json_decode($response, true);
+    if ($data === null) {
+        die_hard("Unable to load decode Slack response");
+    }
+
+    if ($data['ok'] !== true) {
+        die_hard("Slack error: %s", $data['error']);
+    }
+
+    $last_name = $data['profile']['last_name'];
+    if (str_ends_with($last_name, ltrim($add_suffix))) {
+        printf("already marked\n");
+        continue;
+    }
+
+    $params['profile'] = json_encode([
+        'last_name' => trim($last_name.$add_suffix),
+    ]);
+
+    // Updating
+    if (curl_setopt($curl, CURLOPT_URL, $api_set_url.'?'.http_build_query($params)) === false) {
+        die_hard("Setting curl options failed");
+    }
+
+    // Execute cURL request and close session
+    $response = curl_exec($curl);
+    if ($response === false) {
+        die_hard("Unable to save user data to Slack");
+    }
+
+    $data = json_decode($response, true);
+    if ($data === null) {
+        die_hard("Unable to load decode Slack response");
+    }
+
+    if ($data['ok'] !== true) {
+        die_hard("Slack error: %s", $data['error']);
+    }
+
+    printf("OK\n");
+}
+
+curl_close($curl);
